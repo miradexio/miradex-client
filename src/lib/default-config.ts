@@ -186,7 +186,7 @@ export const SWEEP_TIMEOUT_MS = 3_600_000;
 export const POW_MAX_RETRIES = 3;
 export const POW_BACKOFF_MS = 2_000;
 
-export const DEFAULT_SLIPPAGE_BPS = 100;
+export const DEFAULT_SLIPPAGE_BPS = 300;
 export const DEFAULT_MAX_DEVIATION_BPS = 300;
 export const DEFAULT_FROM_TOKEN = 'BTC';
 export const DEFAULT_TO_TOKEN = 'XMR';

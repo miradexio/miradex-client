@@ -74,7 +74,7 @@ export const DEFAULT_ENGINE_CONFIG = {
   apiTimeout: 60_000,
   apiMaxRetries: 3,
   network: 'mainnet' as const,
-  slippageBps: 100,
+  slippageBps: 300,
 } as const;
 
 interface EngineEvents {
@@ -100,7 +100,7 @@ export class MiradexEngine extends EventEmitter<EngineEvents> {
   constructor(config: EngineConfig, platform: PlatformAdapter) {
     super();
 
-    const slippageBps = config.slippageBps ?? 100;
+    const slippageBps = config.slippageBps ?? 300;
     // Tight band on mainnet/testnet (UX guard against catastrophic trades);
     // wide on regtest to accommodate shallow mocknet pools.
     const network = config.network ?? 'mainnet';
