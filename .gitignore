@@ -1,0 +1,29 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+package-lock.json
+
+# Environment
+.env
+.env.*
+
+# Swap backups (contain private key material)
+swap-backup-*.json
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+
+# Debug logs
+*.log
+
+
+docs
+target

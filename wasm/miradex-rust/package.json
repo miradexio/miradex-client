@@ -1,0 +1,24 @@
+{
+  "name": "miradex-rust",
+  "type": "module",
+  "description": "BTC/XMR atomic-swap cryptographic primitives. Consolidation of keygen-wasm and monero-sweep-wasm.",
+  "version": "0.1.0",
+  "files": [
+    "miradex_rust_bg.wasm",
+    "miradex_rust.js",
+    "miradex_rust.d.ts"
+  ],
+  "main": "miradex_rust.js",
+  "types": "miradex_rust.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "exports": {
+    ".": {
+      "types": "./miradex_rust.d.ts",
+      "import": "./miradex_rust.js"
+    },
+    "./wasm": "./miradex_rust_bg.wasm",
+    "./package.json": "./package.json"
+  }
+}

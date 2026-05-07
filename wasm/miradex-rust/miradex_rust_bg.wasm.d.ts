@@ -1,0 +1,31 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const compute_commitment_mask: (a: number, b: number, c: number, d: number, e: number, f: bigint) => void;
+export const decrypt_amount: (a: number, b: number, c: number, d: number, e: number, f: bigint, g: number, h: number) => void;
+export const decrypt_signature: (a: number, b: number, c: number, d: number, e: number) => void;
+export const derive_key_images: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const ed25519_scalar_add: (a: number, b: number, c: number, d: number, e: number) => void;
+export const encsign_digest: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const generate_client_keys: (a: number) => void;
+export const generate_client_keys_from_seed: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const init_panic_hook: () => void;
+export const recover_adaptor_scalar: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const secp256k1_scalar_to_ed25519: (a: number, b: number, c: number) => void;
+export const select_decoys: (a: number, b: bigint, c: number, d: number, e: number) => void;
+export const sign_digest: (a: number, b: number, c: number, d: number, e: number) => void;
+export const sign_sweep_tx: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const verify_commitment: (a: number, b: number, c: number, d: number, e: number, f: bigint, g: bigint, h: number, i: number) => void;
+export const verify_dleq_proof: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const verify_encsig: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+export const version: (a: number) => void;
+export const rustsecp256k1_v0_9_2_context_create: (a: number) => number;
+export const rustsecp256k1_v0_9_2_context_destroy: (a: number) => void;
+export const rustsecp256k1_v0_9_2_default_error_callback_fn: (a: number, b: number) => void;
+export const rustsecp256k1_v0_9_2_default_illegal_callback_fn: (a: number, b: number) => void;
+export const __wbindgen_export: (a: number) => void;
+export const __wbindgen_export2: (a: number, b: number, c: number) => void;
+export const __wbindgen_export3: (a: number, b: number) => number;
+export const __wbindgen_export4: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_add_to_stack_pointer: (a: number) => number;
+export const __wbindgen_start: () => void;

@@ -1,0 +1,51 @@
+# Sources & build inputs
+src/
+tests/
+miradex-rust/
+scripts/
+tsconfig.json
+*.tsbuildinfo
+
+# Rust / wasm-pack build artifacts (transient — output is staged into wasm/)
+target/
+pkg/
+
+# Project docs that aren't part of the SDK contract
+# (README.md and LICENSE are auto-included by npm and stay shipped)
+ATOMIC-SWAP-PAPER.md
+PROTOCOLS.md
+
+# Repo metadata
+.git/
+.gitignore
+.github/
+.editorconfig
+.vscode/
+.idea/
+
+# Test outputs
+coverage/
+.nyc_output/
+
+# Local env / secrets (defense in depth)
+.env
+.env.*
+
+# Editor / OS noise
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package manager state (never publish these)
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

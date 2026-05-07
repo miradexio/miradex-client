@@ -1,0 +1,82 @@
+# Stand-alone workspace — this crate lives outside the core eigenwallet workspace
+# and inside @miradex/client. Build output lands in ../wasm/miradex-rust via
+# scripts/build-wasm.sh.
+[workspace]
+
+[package]
+name = "miradex-rust"
+version = "0.1.0"
+edition = "2021"
+description = "BTC/XMR atomic-swap cryptographic primitives. Consolidation of keygen-wasm and monero-sweep-wasm."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console-errors"]
+console-errors = ["dep:console_error_panic_hook"]
+
+[dependencies]
+# Crypto — versions mirror core/Cargo.toml [workspace.dependencies]
+curve25519-dalek = { version = "4", package = "curve25519-dalek", features = ["rand_core", "serde"] }
+curve25519-dalek-ng = { package = "curve25519-dalek-ng", version = "4" }
+ecdsa_fun = { version = "0.10", default-features = false, features = ["libsecp_compat", "serde", "adaptor"] }
+sigma_fun = { version = "0.7", default-features = false, features = ["ed25519", "secp256k1", "serde", "alloc"] }
+sha2 = "0.10"
+rand = "0.8"
+rand_chacha = "0.3"
+rand_core = "0.6"
+rand_distr = "0.4"
+zeroize = "^1.5"
+
+# Monero
+monero-oxide = { git = "https://github.com/kayabaNerve/monero-oxide.git" }
+monero-oxide-wallet = { git = "https://github.com/kayabaNerve/monero-oxide.git", package = "monero-wallet" }
+monero-address = { git = "https://github.com/kayabaNerve/monero-oxide.git" }
+
+# Serialisation
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+hex = "0.4"
+thiserror = "1"
+
+# WASM glue
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+console_error_panic_hook = { version = "0.1", optional = true }
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+hex-literal = "0.4"
+
+[[test]]
+name = "kat_keygen_wasm"
+path = "tests-wasm/kat_keygen_wasm.rs"
+
+[[test]]
+name = "kat_ecdsa_wasm"
+path = "tests-wasm/kat_ecdsa_wasm.rs"
+
+[[test]]
+name = "kat_adaptor_wasm"
+path = "tests-wasm/kat_adaptor_wasm.rs"
+
+[[test]]
+name = "kat_monero_wasm"
+path = "tests-wasm/kat_monero_wasm.rs"
+
+[[test]]
+name = "size_snapshot"
+path = "tests-wasm/size_snapshot.rs"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

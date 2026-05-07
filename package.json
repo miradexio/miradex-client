@@ -1,0 +1,127 @@
+{
+  "name": "@miradexio/client",
+  "version": "0.1.2",
+  "description": "Headless crypto swap SDK — BTC/XMR atomic swaps, THORChain, Chainflip, NEAR Intents. Works in Node.js, browsers, React Native, and bots.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./portable": {
+      "types": "./dist/portable.d.ts",
+      "import": "./dist/portable.js"
+    },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js"
+    },
+    "./atomic-swap": {
+      "types": "./dist/atomic-swap/index.d.ts",
+      "import": "./dist/atomic-swap/index.js"
+    },
+    "./atomic-swap/presign": {
+      "types": "./dist/atomic-swap/presign.d.ts",
+      "import": "./dist/atomic-swap/presign.js"
+    },
+    "./atomic-swap/refund": {
+      "types": "./dist/atomic-swap/refund.d.ts",
+      "import": "./dist/atomic-swap/refund.js"
+    },
+    "./atomic-swap/monero-sweep": {
+      "types": "./dist/atomic-swap/monero-sweep/index.d.ts",
+      "import": "./dist/atomic-swap/monero-sweep/index.js"
+    },
+    "./verification": {
+      "types": "./dist/verification/index.d.ts",
+      "import": "./dist/verification/index.js"
+    },
+    "./verification/thorchain": {
+      "types": "./dist/verification/thorchain.d.ts",
+      "import": "./dist/verification/thorchain.js"
+    },
+    "./verification/chainflip": {
+      "types": "./dist/verification/chainflip.d.ts",
+      "import": "./dist/verification/chainflip.js"
+    },
+    "./verification/near-intents": {
+      "types": "./dist/verification/near-intents.d.ts",
+      "import": "./dist/verification/near-intents.js"
+    },
+    "./lib/bitcoin/tx-verify": {
+      "types": "./dist/lib/bitcoin/tx-verify.d.ts",
+      "import": "./dist/lib/bitcoin/tx-verify.js"
+    },
+    "./lib/monero/verify-lock": {
+      "types": "./dist/lib/monero/verify-lock.d.ts",
+      "import": "./dist/lib/monero/verify-lock.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build:wasm": "bash miradex-rust/scripts/build-wasm.sh && pnpm run pin-wasm",
+    "build:all": "pnpm run build:wasm && pnpm run build",
+    "pin-wasm": "node scripts/pin-wasm.mjs",
+    "verify-wasm": "node scripts/verify-wasm.mjs",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run build:all"
+  },
+  "keywords": [
+    "crypto",
+    "swap",
+    "atomic-swap",
+    "btc",
+    "xmr",
+    "monero",
+    "bitcoin",
+    "thorchain",
+    "chainflip",
+    "near-intents",
+    "sdk",
+    "headless",
+    "cross-chain"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miradexio/miradex-client"
+  },
+  "homepage": "https://github.com/miradexio/miradex-client",
+  "bugs": {
+    "url": "https://github.com/miradexio/miradex-client/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist/",
+    "wasm/"
+  ],
+  "dependencies": {
+    "@noble/ed25519": "^3.0.1",
+    "@noble/hashes": "^2.0.1",
+    "@scure/base": "^2.0.0",
+    "bip32": "^4.0.0",
+    "bip39": "^3.1.0",
+    "bitcoinjs-lib": "^7.0.1",
+    "ecpair": "^3.0.1",
+    "eventemitter3": "^5.0.4",
+    "tiny-secp256k1": "^2.2.4",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "fast-check": "^4.6.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.9"
+  }
+}
