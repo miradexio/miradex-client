@@ -127,6 +127,8 @@ export function atomicPipelineStage(phase: AtomicFlowState['phase']): PipelineSt
       return 'refunded';
     case 'failed':
       return null;
+    case 'stalled':
+      return 'exchanging';
   }
 }
 

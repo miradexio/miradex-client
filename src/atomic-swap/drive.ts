@@ -38,6 +38,7 @@ import {
   TERMINAL_STATUSES,
   VerificationError,
   ProtocolError,
+  isPreFunding,
 } from '../types/index.js';
 import { constantTimeEqualHex } from '../lib/crypto/bytes.js';
 import { encsignDigest, verifyDleqProof, ensureWasm } from '../lib/crypto/wasm.js';
@@ -86,7 +87,7 @@ export async function driveSwapToCompletion(options: DriveSwapOptions): Promise<
   log.info({ swapId, network, deadline: new Date(deadline).toISOString() }, '[drive] loop started');
 
   let lastLoggedAction: string | undefined;
-  while (Date.now() < deadline) {
+  while (true) {
     if (signal?.aborted) throw new SwapCancelledError();
 
     const detail = await api.getSwapDetail(swapId);
@@ -105,6 +106,10 @@ export async function driveSwapToCompletion(options: DriveSwapOptions): Promise<
       log.info({ swapId, status: detail.status }, '[drive] terminal status reached');
       onProgress({ stage: detail.status, message: `Swap ${detail.status}`, swapId });
       return;
+    }
+
+    if (Date.now() >= deadline && isPreFunding(detail.status)) {
+      throw new ProtocolError('E_DRIVE_TIMEOUT', 'swap timed out before funding');
     }
 
     if (action === 'fund') {
@@ -653,6 +658,7 @@ export async function driveSwapToCompletion(options: DriveSwapOptions): Promise<
         expectedSAMonero: pp.S_a_monero,
         monerodNodes: options.monerodNodes,
         logger: log,
+        signal,
       });
       onProgress({
         stage: 'complete',
@@ -679,8 +685,6 @@ export async function driveSwapToCompletion(options: DriveSwapOptions): Promise<
     });
     await delay(POLL_MS, signal);
   }
-
-  throw new ProtocolError('E_DRIVE_TIMEOUT', 'swap timed out waiting for progress');
 }
 
 // @internal Funding-proof payload (nonce + sig per UTXO) the server requires

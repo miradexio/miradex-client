@@ -354,11 +354,9 @@ export function secp256k1_scalar_to_ed25519(secp_scalar_hex) {
 }
 
 /**
- * Select decoys for a CLSAG ring using wallet2's gamma distribution.
- *
- * The JSON input may optionally include `unlock_window_blocks` to override
- * wallet2's `DEFAULT_LOCK_WINDOW` (10). Use 60 (coinbase lock) on chains
- * dominated by coinbase outputs (regtest, conservative configurations).
+ * CLSAG ring decoys via wallet2's gamma distribution. JSON input may
+ * override `unlock_window_blocks` (default DEFAULT_LOCK_WINDOW=10);
+ * use 60 (coinbase lock) on coinbase-only chains (regtest, conservative).
  * @param {bigint} real_output_index
  * @param {string} cumulative_distribution_json
  * @param {number} ring_size
@@ -557,7 +555,7 @@ export function verify_encsig(verification_key_hex, encryption_key_hex, digest_h
 }
 
 /**
- * Crate version string — used by consumers to verify pin drift.
+ * Used by consumers to detect pin drift.
  * @returns {string}
  */
 export function version() {

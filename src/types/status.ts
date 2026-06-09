@@ -23,3 +23,13 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set<string>([
   'withheld',
   'expired',
 ]);
+
+export const PRE_FUNDING_STATUSES: ReadonlySet<string> = new Set<string>([
+  'pending',
+  'awaiting_funding',
+  'initializing',
+]);
+
+export function isPreFunding(status: string): boolean {
+  return PRE_FUNDING_STATUSES.has(status);
+}

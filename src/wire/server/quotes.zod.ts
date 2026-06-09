@@ -9,6 +9,7 @@ export const swapFeeSchema = z.object({
   type: z.string(),
   amount: z.string(),
   token: z.string(),
+  amountUsd: z.string().nullable(),
 });
 export type SwapFee = z.infer<typeof swapFeeSchema>;
 

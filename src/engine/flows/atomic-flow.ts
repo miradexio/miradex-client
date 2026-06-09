@@ -12,6 +12,7 @@ import type {
   VerificationResult,
 } from '../../types/index.js';
 import { TERMINAL_STATUSES, ProtocolError } from '../../types/index.js';
+import { routeError } from './error-routing.js';
 import type {
   FlowContext,
   PopulatedFlowContext,
@@ -47,6 +48,16 @@ import { extractProtocolData } from '../../atomic-swap/extract.js';
 
 const DEFAULT_POLL_MS = 5_000;
 const MAX_TRANSIENT_RETRIES = 5;
+
+const SWAP_STATUS_STAGES: ReadonlySet<string> = new Set<string>([
+  'pending',
+  'awaiting_funding',
+  'initializing',
+  'deposited',
+  'swapping',
+  'sending',
+  'punished',
+]);
 function isTransientError(err: unknown): boolean {
   if (err instanceof NetworkError) return true;
   if (err instanceof ApiError) {
@@ -88,6 +99,7 @@ export class AtomicFlow {
   private lastEmittedState: AtomicFlowState = { phase: 'idle', snapshot: null };
   private flowCtx: FlowContext | null = null;
   private lastProgressKey: string | null = null;
+  private lastSeenStatus: string | null = null;
   private readonly pollMs: number;
   // Set once the driver emits a terminal phase. Suppresses the post-driver
   // requiredAction re-check that would otherwise trigger a phantom second
@@ -658,6 +670,9 @@ export class AtomicFlow {
     if (p.swapId) this.setFlowContext({ swapId: p.swapId });
     if (p.swapNumber) this.setFlowContext({ swapNumber: p.swapNumber });
     if (p.verification) this.setFlowContext({ verification: p.verification });
+    if (SWAP_STATUS_STAGES.has(p.stage)) {
+      this.lastSeenStatus = p.stage;
+    }
 
     switch (p.stage) {
       case 'keygen':
@@ -916,6 +931,7 @@ export class AtomicFlow {
         receiveAddress: this.keystore.swap.receiveAddress,
         expectedSAMonero: pp.S_a_monero,
         monerodNodes: this.config.monerodNodes,
+        signal: this.signal,
         onProgress: (stage: string) => {
           const sweepStep = stage.includes('key') ? 'key-images'
             : stage.includes('submit') || stage.includes('broadcast') ? 'broadcasting'
@@ -1306,17 +1322,33 @@ export class AtomicFlow {
   }
 
   private handleError(err: unknown): void {
-    if (err instanceof SwapCancelledError || this.signal.aborted) {
-      this.logger.info({ swapId: this.flowCtx?.swapId ?? null }, 'AtomicFlow cancelled');
+    const route = routeError(err, this.signal.aborted, this.lastSeenStatus);
+    const swapId = this.flowCtx?.swapId ?? null;
+
+    if (route.kind === 'cancelled') {
+      this.logger.info({ swapId }, 'AtomicFlow cancelled');
       this.transition({ phase: 'cancelled', snapshot: this.flowCtx, swapId: null, txCancelTxid: null });
       return;
     }
-    const message = err instanceof Error ? err.message : String(err);
-    this.logger.error({ swapId: this.flowCtx?.swapId ?? null, error: message }, 'AtomicFlow error');
-    this.setFlowContext({ extra: { text: message, type: 'error' } });
+
+    this.logger.error({ swapId, error: route.message, kind: route.kind }, 'AtomicFlow error');
+    this.setFlowContext({ extra: { text: route.message, type: 'error' } });
+
+    if (route.kind === 'stalled') {
+      this.transition({
+        phase: 'stalled',
+        snapshot: this.flowCtx,
+        error: route.message,
+        swapId,
+        keystoreId: this.keystoreId.length > 0 ? this.keystoreId : null,
+      });
+      return;
+    }
+
     this.transition({
-      phase: 'failed', snapshot: this.flowCtx,
-      error: message,
+      phase: 'failed',
+      snapshot: this.flowCtx,
+      error: route.message,
     });
   }
 

@@ -1,12 +1,12 @@
 # miradex-rust
 
 Rust source for the BTC/XMR atomic-swap cryptographic primitives used by
-[`@miradex/client`](..). Builds to a WebAssembly module that is consumed by
+[`@miradexio/client`](..). Builds to a WebAssembly module that is consumed by
 the TypeScript SDK at runtime.
 
 This crate is the source of truth. The shipped binary lives at
 `../wasm/miradex-rust/` and is checked into the repo so that ordinary
-contributors do not need a Rust toolchain to work on `@miradex/client`.
+contributors don't need a Rust toolchain to work on `@miradexio/client`.
 
 ## Build the wasm
 
@@ -70,5 +70,4 @@ already-committed binary to the already-committed pin.
 ## What this crate exports
 
 `#[wasm_bindgen]` exports in `src/lib.rs` are mirrored in
-`packages/miradex-client/src/lib/crypto/types.ts`. Adding a new export means
-updating both.
+`../src/lib/crypto/types.ts`. Adding a new export means updating both.

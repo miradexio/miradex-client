@@ -17,7 +17,7 @@ describe('swapQuoteSchema', () => {
     fromChain: 'ethereum',
     toChain: 'bitcoin',
     estimatedDurationSeconds: 600,
-    fees: [{ type: 'network', amount: '0.001', token: 'BTC' }],
+    fees: [{ type: 'network', amount: '0.001', token: 'BTC', amountUsd: '80.00' }],
     recommendedSlippageBps: 300,
     minAmount: '0.01',
     maxAmount: '10',
@@ -33,6 +33,20 @@ describe('swapQuoteSchema', () => {
   it('rejects missing required fields', () => {
     const { expectedOutput: _omit, ...bad } = golden;
     expect(() => swapQuoteSchema.parse(bad)).toThrow();
+  });
+
+  it('parses fees with per-fee amountUsd (server-side USD enrichment)', () => {
+    const parsed = swapQuoteSchema.parse({
+      ...golden,
+      fees: [
+        { type: 'IngressFee', amount: '0.00000328', token: 'BTC', amountUsd: '0.26' },
+        { type: 'NetworkFee', amount: '8.03143', token: 'USDC', amountUsd: '8.03' },
+        { type: 'WeirdFee', amount: '5', token: 'XYZ', amountUsd: null },
+      ],
+    });
+    expect(parsed.fees[0]?.amountUsd).toBe('0.26');
+    expect(parsed.fees[1]?.amountUsd).toBe('8.03');
+    expect(parsed.fees[2]?.amountUsd).toBeNull();
   });
 });
 

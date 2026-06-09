@@ -142,6 +142,14 @@ export interface AtomicFailedPhase {
   readonly error: string;
 }
 
+export interface AtomicStalledPhase {
+  readonly phase: 'stalled';
+  readonly snapshot: FlowContext | null;
+  readonly error: string;
+  readonly swapId: string | null;
+  readonly keystoreId: string | null;
+}
+
 export type AtomicFlowState =
   | AtomicIdlePhase
   | AtomicKeygenPhase
@@ -163,4 +171,5 @@ export type AtomicFlowState =
   | AtomicCompletedPhase
   | AtomicRefundedPhase
   | AtomicCancelledPhase
-  | AtomicFailedPhase;
+  | AtomicFailedPhase
+  | AtomicStalledPhase;

@@ -106,7 +106,10 @@ const atomicSwapKeysSchema = z.object({
   dleq_proof: z.string().min(1),
   v_b: z.string().min(1),
   B: z.string().min(1),
-  libp2p_seed_hex: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+  libp2p_seed_hex: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
 });
 
 const fundingProofEntrySchema = z.object({
@@ -286,7 +289,6 @@ export const swapDetailSchema = z.object({
 export type SwapDetail = z.infer<typeof swapDetailSchema>;
 
 export const recentSwapSchema = z.object({
-  swapNumber: SwapNumberSchema,
   fromToken: z.string(),
   toToken: z.string(),
   provider: swapProviderSchema,

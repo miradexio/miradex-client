@@ -1,6 +1,6 @@
 // Standalone submit_encsig helper. driveSwapToCompletion does this inline.
 
-import { TERMINAL_STATUSES, ProtocolError } from '../types/index.js';
+import { TERMINAL_STATUSES, ProtocolError, isPreFunding } from '../types/index.js';
 import { computeRedeemDigest } from './presign.js';
 import { encsignDigest } from '../lib/crypto/wasm.js';
 import { delay } from '../lib/delay.js';
@@ -14,11 +14,18 @@ export async function submitEncsigWhenReady(options: SubmitEncsigParams): Promis
   const { api, swapId, keys, signedPsbtBase64, network, onProgress, signal } = options;
   const deadline = Date.now() + TIMEOUT_MS;
 
-  while (Date.now() < deadline) {
+  while (true) {
     if (signal?.aborted) throw new SwapCancelledError();
 
     const detail = await api.getSwapDetail(swapId);
     if (TERMINAL_STATUSES.has(detail.status)) return;
+
+    if (Date.now() >= deadline && isPreFunding(detail.status)) {
+      throw new ProtocolError(
+        'E_DRIVE_TIMEOUT',
+        'timed out waiting for submit_encsig signal',
+      );
+    }
 
     const actionType = detail.requiredAction?.type;
 
@@ -54,11 +61,6 @@ export async function submitEncsigWhenReady(options: SubmitEncsigParams): Promis
 
     if (actionType === 'cancel' || actionType === 'refund' || actionType === 'sweep') return;
 
-    await delay(POLL_MS);
+    await delay(POLL_MS, signal);
   }
-
-  throw new ProtocolError(
-    'E_DRIVE_TIMEOUT',
-    'timed out waiting for submit_encsig signal',
-  );
 }

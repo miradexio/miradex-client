@@ -10,6 +10,7 @@ import { delay } from '../../lib/delay.js';
 import type { ApiClient } from '../../api/index.js';
 import type { SwapActionResponse } from '../../types/index.js';
 import { VerificationError } from '../../types/index.js';
+import { SwapCancelledError } from '../types.js';
 import {
   addScalars,
   hexToBytes,
@@ -84,6 +85,7 @@ export interface SweepParams {
   readonly unlockWindowBlocks?: number;
   readonly onProgress?: (stage: string, detail?: string) => void;
   readonly logger?: Logger;
+  readonly signal?: AbortSignal;
 }
 
 export interface SweepResult {
@@ -92,7 +94,6 @@ export interface SweepResult {
   readonly amount: string;
 }
 
-const SWEEP_SYNC_TIMEOUT_MS = 120_000;
 const SWEEP_RETRY_INTERVAL_MS = 15_000;
 const SWEEP_ACTION_TIMEOUT_MS = 120_000;
 // Covers transient monerod failures and intermittent invalid_input from
@@ -112,7 +113,7 @@ import { validateRingMembers } from './ring-select.js';
 import { isRetryableSweepError } from './errors.js';
 
 export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<SweepResult> {
-  const { swapId, s_b, receiveAddress, onProgress, logger: log = noopLogger } = params;
+  const { swapId, s_b, receiveAddress, onProgress, logger: log = noopLogger, signal } = params;
 
   onProgress?.('Loading sweep module...');
   log.info({ swapId }, 'Sweep: loading monero-sweep-wasm');
@@ -122,7 +123,6 @@ export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<
   onProgress?.('Loading sweep data from server...');
   log.info({ swapId }, 'Sweep step 1: requesting redemption keys from server');
 
-  const syncStart = Date.now();
   let sAHex: string | undefined;
   let vHex: string | undefined;
   let lockTxHash: string | undefined;
@@ -130,6 +130,8 @@ export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<
   let serverReceiveAddr: string | undefined;
 
   while (true) {
+    if (signal?.aborted) throw new SwapCancelledError();
+
     const outputsAction: SwapActionResponse = await api.executeAction(
       swapId,
       { type: 'get-outputs' },
@@ -145,14 +147,9 @@ export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<
 
     if (sAHex && vHex && lockTxHash) break;
 
-    if (Date.now() - syncStart >= SWEEP_SYNC_TIMEOUT_MS) {
-      log.error({ swapId, elapsed: Date.now() - syncStart }, 'Sweep key retrieval timed out');
-      throw new Error('Sweep key retrieval timed out');
-    }
-
     onProgress?.('Waiting for sweep data...');
-    log.debug({ swapId, elapsed: Date.now() - syncStart, hasSA: !!sAHex, hasV: !!vHex, hasHash: !!lockTxHash }, 'Not ready, retrying');
-    await delay(SWEEP_RETRY_INTERVAL_MS);
+    log.debug({ swapId, hasSA: !!sAHex, hasV: !!vHex, hasHash: !!lockTxHash }, 'Not ready, retrying');
+    await delay(SWEEP_RETRY_INTERVAL_MS, signal);
   }
 
   if (!lockAddress) throw new Error('Server did not return monero_lock_address');
