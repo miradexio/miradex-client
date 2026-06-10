@@ -1,5 +1,5 @@
-import type { ApiClient } from '../../api/index.js';
-import { ApiError, NetworkError } from '../../api/index.js';
+import type { ApiClient, SwapApi } from '../../api/index.js';
+import { ApiError, NetworkError, createAuthorizedSwapApi } from '../../api/index.js';
 import type { PlatformAdapter, DetectedDeposit } from '../platform.js';
 import type { ResolvedEngineConfig } from '../miradex-engine.js';
 import type { AtomicFlowState, AtomicSweepingPhase } from './atomic-flow-state.js';
@@ -127,6 +127,18 @@ export class AtomicFlow {
 
   private get logger(): PlatformAdapter['logger'] {
     return this.platform.logger;
+  }
+
+  // Proof-bound API view for swap-scoped calls. The keystore's receive
+  // address is the destAddress ownership proof — without it the server
+  // returns restricted detail (no protocol params) and rejects actions.
+  private authorizedApi(): SwapApi {
+    if (!this.keystore) {
+      throw new Error('keystore must be set before swap-scoped API calls');
+    }
+    return createAuthorizedSwapApi(this.api, {
+      destAddress: this.keystore.swap.receiveAddress,
+    });
   }
 
   private setFlowContext(partial: Partial<FlowContext>): void {
@@ -571,7 +583,7 @@ export class AtomicFlow {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
       try {
-        return await this.api.getSwapDetail(swapId);
+        return await this.authorizedApi().getSwapDetail(swapId);
       } catch (err: unknown) {
         if (!isTransientError(err)) throw err;
         lastErr = err;
@@ -604,7 +616,7 @@ export class AtomicFlow {
     const blockchain = await this.platform.createBlockchainProvider(network);
 
     const result = await coreResumeAtomicSwap({
-      api: this.api,
+      api: this.authorizedApi(),
       params: {
         keystore: this.keystore,
         deposit: this.deposit ?? { txid: '', vout: 0, value: 0, confirmations: 0, status: 'mempool' as const, utxos: [] },
@@ -631,7 +643,7 @@ export class AtomicFlow {
     let finalStatus = 'completed';
     let requiredAction: RequiredAction | null = null;
     try {
-      const detail = await this.api.getSwapDetail(result.swapId);
+      const detail = await this.authorizedApi().getSwapDetail(result.swapId);
       finalStatus = detail.status;
       requiredAction = detail.requiredAction ?? null;
       this.setFlowContext({ swapId: result.swapId, swapNumber: detail.swapNumber ?? null });
@@ -857,7 +869,7 @@ export class AtomicFlow {
     });
 
     try {
-      const result = await this.api.executeAction(swapId, { type: 'cancel' });
+      const result = await this.authorizedApi().executeAction(swapId, { type: 'cancel' });
       this.transition({
         phase: 'cancelled',
         snapshot: this.flowCtx,
@@ -914,7 +926,7 @@ export class AtomicFlow {
         (this.keystore.keys.s_b.match(/.{2}/g) ?? []).map((b: string) => parseInt(b, 16)),
       );
 
-      const freshDetail = await this.api.getSwapDetail(swapId);
+      const freshDetail = await this.authorizedApi().getSwapDetail(swapId);
       const pp =
         freshDetail.protocolData?.type === 'atomicswap'
           ? freshDetail.protocolData.params
@@ -926,7 +938,7 @@ export class AtomicFlow {
         );
       }
 
-      const result = await sweepMonero(this.api, {
+      const result = await sweepMonero(this.authorizedApi(), {
         swapId, s_b: s_b_bytes,
         receiveAddress: this.keystore.swap.receiveAddress,
         expectedSAMonero: pp.S_a_monero,
@@ -959,7 +971,7 @@ export class AtomicFlow {
       this.logger.error({ swapId, error: msg }, 'Sweep failed');
       if (msg.includes("'completed'") || msg.includes('"completed"')) {
         try {
-          const detail = await this.api.getSwapDetail(swapId);
+          const detail = await this.authorizedApi().getSwapDetail(swapId);
           this.emitTerminal(swapId, 'completed', detail);
           return;
         } catch { /* fall through */ }
@@ -979,7 +991,7 @@ export class AtomicFlow {
 
     this.logger.info({ swapId }, 'Starting client-side refund');
 
-    const detail = await this.api.getSwapDetail(swapId).catch(() => null);
+    const detail = await this.authorizedApi().getSwapDetail(swapId).catch(() => null);
     if (!detail) {
       this.emitError('refunding', 'Could not fetch swap detail for refund');
       return;
@@ -1153,7 +1165,7 @@ export class AtomicFlow {
     }
 
     try {
-      await this.api.executeAction(swapId, {
+      await this.authorizedApi().executeAction(swapId, {
         type: 'notify-refund',
         refund_txid: broadcastTxid,
       });
@@ -1254,7 +1266,7 @@ export class AtomicFlow {
   private async pollUntilTerminal(swapId: string): Promise<void> {
     while (!this.signal.aborted) {
       try {
-        const detail = await this.api.getSwapDetail(swapId);
+        const detail = await this.authorizedApi().getSwapDetail(swapId);
         if (TERMINAL_STATUSES.has(detail.status)) {
           this.emitTerminal(swapId, detail.status, detail);
           return;

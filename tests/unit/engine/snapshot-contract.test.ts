@@ -807,7 +807,12 @@ describe('SwapFlow server error resilience', () => {
       throw new ApiError('Not Found', 404, 'NOT_FOUND');
     };
 
-    await flow.resume('swap-404', 'thorchain', 'BTC', 'ETH');
+    await flow.resume({
+      swapId: 'swap-404',
+      provider: 'thorchain',
+      fromToken: 'BTC',
+      toToken: 'ETH',
+    });
 
     const failed = emissions.find((e) => e.phase === 'failed');
     expect(failed).toBeDefined();
@@ -830,7 +835,12 @@ describe('SwapFlow server error resilience', () => {
       status: 'completed' as SwapStatus,
     }));
 
-    await flow.resume('swap-retry', 'thorchain', 'BTC', 'ETH');
+    await flow.resume({
+      swapId: 'swap-retry',
+      provider: 'thorchain',
+      fromToken: 'BTC',
+      toToken: 'ETH',
+    });
 
     // Should have eventually succeeded
     const completed = emissions.find((e) => e.phase === 'completed');

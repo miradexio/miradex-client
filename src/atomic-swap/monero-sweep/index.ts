@@ -7,7 +7,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Logger } from '../../interfaces/logger.js';
 import { noopLogger } from '../../interfaces/logger.js';
 import { delay } from '../../lib/delay.js';
-import type { ApiClient } from '../../api/index.js';
+import type { SwapApi } from '../../api/index.js';
 import type { SwapActionResponse } from '../../types/index.js';
 import { VerificationError } from '../../types/index.js';
 import { SwapCancelledError } from '../types.js';
@@ -112,7 +112,7 @@ const RING_SIZE = 16;
 import { validateRingMembers } from './ring-select.js';
 import { isRetryableSweepError } from './errors.js';
 
-export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<SweepResult> {
+export async function sweepMonero(api: SwapApi, params: SweepParams): Promise<SweepResult> {
   const { swapId, s_b, receiveAddress, onProgress, logger: log = noopLogger, signal } = params;
 
   onProgress?.('Loading sweep module...');
@@ -135,7 +135,7 @@ export async function sweepMonero(api: ApiClient, params: SweepParams): Promise<
     const outputsAction: SwapActionResponse = await api.executeAction(
       swapId,
       { type: 'get-outputs' },
-      SWEEP_ACTION_TIMEOUT_MS,
+      { timeoutMs: SWEEP_ACTION_TIMEOUT_MS },
     );
 
     const sweepData = parseSweepOutputs(outputsAction.protocolData);
@@ -243,7 +243,7 @@ async function sweepScanSignBroadcast(ctx: {
   readonly spendKeyHex: string;
   readonly spendPubHex: string;
   readonly receiveAddress: string;
-  readonly api: ApiClient;
+  readonly api: SwapApi;
   readonly log: Logger;
   readonly onProgress?: (stage: string, detail?: string) => void;
   readonly unlockWindowBlocks?: number;
@@ -568,7 +568,7 @@ async function sweepScanSignBroadcast(ctx: {
       await api.executeAction(
         swapId,
         { type: 'sweep-complete', txHash: sweepTxHash },
-        15_000,
+        { timeoutMs: 15_000 },
       );
       log.info({ swapId, txHash: sweepTxHash }, 'Server notified of sweep completion');
       break;

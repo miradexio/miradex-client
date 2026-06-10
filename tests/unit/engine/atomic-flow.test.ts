@@ -104,6 +104,28 @@ describe('AtomicFlow', () => {
       }
     });
 
+    it('sends the keystore receive address as ownership proof on every swap-scoped call', async () => {
+      const ks = buildTestKeystore();
+      const { id } = await platform.saveKeystore(ks, '0.001');
+      platform.simulateDeposit(mockDeposit());
+
+      api.setSwapDetail('swap-1', buildSwapDetail({
+        swapNumber: 'swap-1',
+        status: 'completed' as SwapStatus,
+        actualAmountOut: '0.05',
+        outputTxHash: 'xmr-hash',
+      }));
+
+      await flow.resumeFromKeystore(id, 'swap-1');
+
+      const detailCalls = api.getCalls().filter((c) => c.method === 'getSwapDetail');
+      expect(detailCalls.length).toBeGreaterThan(0);
+      for (const call of detailCalls) {
+        const proof = call.args?.proof as { readonly destAddress?: string } | undefined;
+        expect(proof?.destAddress).toBe(ks.swap.receiveAddress);
+      }
+    });
+
     it('enters creating-swap phase for non-terminal swap', async () => {
       const ks = buildTestKeystore();
       const { id } = await platform.saveKeystore(ks, '0.001');

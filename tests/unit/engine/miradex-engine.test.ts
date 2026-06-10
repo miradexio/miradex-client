@@ -169,6 +169,24 @@ describe('MiradexEngine', () => {
         expect(failed.swap.error).toContain('Resume failed');
       }
     });
+
+    it('forwards the destAddress ownership proof to all detail fetches', async () => {
+      api.setSwapDetail('swap-proofed', buildSwapDetail({
+        swapNumber: 'swap-proofed',
+        provider: 'thorchain',
+        status: 'completed' as SwapStatus,
+      }));
+
+      await engine.resume('swap-proofed', { destAddress: '0xdest' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      const detailCalls = api.getCalls().filter((c) => c.method === 'getSwapDetail');
+      expect(detailCalls.length).toBeGreaterThan(0);
+      for (const call of detailCalls) {
+        const proof = call.args?.proof as { readonly destAddress?: string } | undefined;
+        expect(proof?.destAddress).toBe('0xdest');
+      }
+    });
   });
 
   describe('cancelSwap()', () => {

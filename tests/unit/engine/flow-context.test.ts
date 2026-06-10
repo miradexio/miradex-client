@@ -9,6 +9,21 @@ import {
 import type { FlowContext } from '../../../src/engine/flow-context.js';
 
 describe('FlowContext Zod validation', () => {
+  describe('restricted flag', () => {
+    it('defaults restricted to false', () => {
+      expect(createFlowContext({}).restricted).toBe(false);
+    });
+
+    it('carries restricted=true through base validation', () => {
+      const ctx = createFlowContext({ restricted: true });
+      const result = validateBase(ctx, 'restricted-test');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.restricted).toBe(true);
+      }
+    });
+  });
+
   describe('validateBase', () => {
     it('accepts a valid base context with all nulls', () => {
       const ctx = createFlowContext({});

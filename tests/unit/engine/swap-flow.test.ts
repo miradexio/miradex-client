@@ -160,7 +160,12 @@ describe('SwapFlow', () => {
           status: 'completed' as SwapStatus,
         }),
       ]);
-      await flow.resume('swap-resume-1', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-resume-1',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const deposit = emissions.find((e) => e.phase === 'awaiting-deposit');
       expect(deposit).toBeDefined();
@@ -176,7 +181,12 @@ describe('SwapFlow', () => {
         status: 'completed' as SwapStatus,
         actualAmountOut: '0.24',
       }));
-      await flow.resume('swap-done', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-done',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const completed = emissions.find((e) => e.phase === 'completed');
       expect(completed).toBeDefined();
@@ -190,10 +200,113 @@ describe('SwapFlow', () => {
         swapNumber: 'swap-fail',
         status: 'failed' as SwapStatus,
       }));
-      await flow.resume('swap-fail', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-fail',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const failed = emissions.find((e) => e.phase === 'failed');
       expect(failed).toBeDefined();
+    });
+
+    it('passes the ownership proof to every detail fetch', async () => {
+      api.setSwapDetail('swap-proof', buildSwapDetail({
+        swapNumber: 'swap-proof',
+        status: 'completed' as SwapStatus,
+      }));
+
+      await flow.resume({
+        swapId: 'swap-proof',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+        proof: { destAddress: '0xdest' },
+      });
+
+      const detailCalls = api.getCalls().filter((c) => c.method === 'getSwapDetail');
+      expect(detailCalls.length).toBeGreaterThan(0);
+      for (const call of detailCalls) {
+        const proof = call.args?.proof as { readonly destAddress?: string } | undefined;
+        expect(proof?.destAddress).toBe('0xdest');
+      }
+    });
+  });
+
+  describe('resume() — restricted detail (no ownership proof)', () => {
+    function buildRestrictedDetail(
+      overrides?: Partial<ReturnType<typeof buildSwapDetail>>,
+    ): ReturnType<typeof buildSwapDetail> {
+      return buildSwapDetail({
+        access: 'restricted',
+        depositAddress: null,
+        fundingAddress: null,
+        destAddress: null,
+        refundAddress: null,
+        depositTxHash: null,
+        outputTxHash: null,
+        refundTxHash: null,
+        expiresAt: null,
+        verification: null,
+        ...overrides,
+      });
+    }
+
+    it('emits a terminal receipt for a restricted completed swap', async () => {
+      api.setSwapDetail('swap-restricted-done', buildRestrictedDetail({
+        swapNumber: 'swap-restricted-done',
+        status: 'completed' as SwapStatus,
+        actualAmountOut: '0.24',
+      }));
+
+      await flow.resume({
+        swapId: 'swap-restricted-done',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
+
+      expect(emissions.some((e) => e.phase === 'failed')).toBe(false);
+      const completed = emissions.find((e) => e.phase === 'completed');
+      expect(completed).toBeDefined();
+      if (completed?.phase === 'completed') {
+        expect(completed.actualOut).toBe('0.24');
+        expect(completed.snapshot?.restricted).toBe(true);
+      }
+    });
+
+    it('tracks a live restricted swap to completion without failing validation', async () => {
+      api.setSwapDetail('swap-restricted-live', [
+        buildRestrictedDetail({
+          swapNumber: 'swap-restricted-live',
+          status: 'swapping' as SwapStatus,
+          actualAmountOut: null,
+          completedAt: null,
+        }),
+        buildRestrictedDetail({
+          swapNumber: 'swap-restricted-live',
+          status: 'completed' as SwapStatus,
+          actualAmountOut: '0.24',
+        }),
+      ]);
+
+      await flow.resume({
+        swapId: 'swap-restricted-live',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
+
+      expect(emissions.some((e) => e.phase === 'failed')).toBe(false);
+      const swapping = emissions.find((e) => e.phase === 'swapping');
+      expect(swapping).toBeDefined();
+      if (swapping && 'snapshot' in swapping && swapping.snapshot) {
+        expect(swapping.snapshot.restricted).toBe(true);
+        expect(swapping.snapshot.depositAddr).toBeNull();
+      }
+      const completed = emissions.find((e) => e.phase === 'completed');
+      expect(completed).toBeDefined();
     });
   });
 
@@ -439,7 +552,12 @@ describe('SwapFlow', () => {
           status: 'completed' as SwapStatus,
         }),
       ]);
-      await flow.resume('swap-resume-dep', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-resume-dep',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const confirming = emissions.find((e) => e.phase === 'confirming');
       expect(confirming).toBeDefined();
@@ -456,7 +574,12 @@ describe('SwapFlow', () => {
           status: 'refunded' as SwapStatus,
         }),
       );
-      await flow.resume('swap-refunded', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-refunded',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const refunded = emissions.find((e) => e.phase === 'refunded');
       expect(refunded).toBeDefined();
@@ -470,7 +593,12 @@ describe('SwapFlow', () => {
           status: 'expired' as SwapStatus,
         }),
       );
-      await flow.resume('swap-expired', 'thorchain', 'BTC', 'ETH');
+      await flow.resume({
+        swapId: 'swap-expired',
+        provider: 'thorchain',
+        fromToken: 'BTC',
+        toToken: 'ETH',
+      });
 
       const expired = emissions.find((e) => e.phase === 'expired');
       expect(expired).toBeDefined();

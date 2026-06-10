@@ -251,8 +251,19 @@ export const createSwapResponseSchema = z.object({
 });
 export type CreateSwapResponse = z.infer<typeof createSwapResponseSchema>;
 
+// access: 'restricted' = caller did not prove ownership (no/wrong destAddress
+// query param) and sensitive fields are nulled. Optional for back-compat with
+// servers that predate the field — absence means full.
+export const swapAccessSchema = z.enum(['full', 'restricted']);
+export type SwapAccess = z.infer<typeof swapAccessSchema>;
+
+export function isRestrictedDetail(detail: { readonly access?: SwapAccess }): boolean {
+  return detail.access === 'restricted';
+}
+
 export const swapDetailSchema = z.object({
   swapNumber: SwapNumberSchema,
+  access: swapAccessSchema.optional(),
   status: swapStatusSchema,
   provider: swapProviderSchema,
   fromToken: z.string(),
@@ -268,7 +279,7 @@ export const swapDetailSchema = z.object({
   priceImpactPct: z.string().nullable(),
   depositAddress: z.string().nullable(),
   fundingAddress: z.string().nullable(),
-  destAddress: z.string(),
+  destAddress: z.string().nullable(),
   refundAddress: z.string().nullable(),
   depositTxHash: z.string().nullable(),
   outputTxHash: z.string().nullable(),

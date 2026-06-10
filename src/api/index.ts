@@ -44,6 +44,50 @@ import type {
 // Back-compat re-exports; canonical definitions live in lib/errors.ts.
 export { ApiError, NetworkError };
 
+/**
+ * Address-knowledge ownership proof. The server returns full swap detail
+ * (and accepts actions) only when this matches the swap's destination
+ * address; otherwise GET responses are restricted and actions are rejected.
+ */
+export interface SwapOwnershipProof {
+  readonly destAddress: string;
+}
+
+export interface ExecuteActionOptions {
+  readonly timeoutMs?: number;
+  readonly proof?: SwapOwnershipProof;
+}
+
+/**
+ * The API surface swap flows and atomic-swap helpers depend on. ApiClient
+ * implements it structurally; createAuthorizedSwapApi returns a proof-bound
+ * view so per-swap modules never thread the proof through call sites.
+ */
+export interface SwapApi {
+  getSwapDetail(id: string, proof?: SwapOwnershipProof): Promise<SwapDetail>;
+  executeAction(
+    swapId: string,
+    action: SwapAction,
+    opts?: ExecuteActionOptions,
+  ): Promise<SwapActionResponse>;
+  createSwap(body: CreateSwapBody, powHeader?: string): Promise<CreateSwapResponse>;
+  getChallenge(): Promise<PowChallenge>;
+  getQuotes(params: GetQuotesParams): Promise<QuotesResponse>;
+  verifyKeys(keys: VerifyKeysBody): Promise<VerifyKeysResponse>;
+}
+
+export function createAuthorizedSwapApi(api: SwapApi, proof: SwapOwnershipProof): SwapApi {
+  return {
+    getSwapDetail: (id, callerProof) => api.getSwapDetail(id, callerProof ?? proof),
+    executeAction: (swapId, action, opts) =>
+      api.executeAction(swapId, action, { ...opts, proof: opts?.proof ?? proof }),
+    createSwap: (body, powHeader) => api.createSwap(body, powHeader),
+    getChallenge: () => api.getChallenge(),
+    getQuotes: (params) => api.getQuotes(params),
+    verifyKeys: (keys) => api.verifyKeys(keys),
+  };
+}
+
 export interface ApiClientConfig {
   readonly baseUrl: string;
   readonly timeout?: number;
@@ -174,8 +218,9 @@ export class ApiClient {
     );
   }
 
-  async getSwapDetail(id: string): Promise<SwapDetail> {
-    return this.get(`/api/v1/swap/${encodeURIComponent(id)}`, swapDetailSchema);
+  async getSwapDetail(id: string, proof?: SwapOwnershipProof): Promise<SwapDetail> {
+    const query = buildProofQuery(proof);
+    return this.get(`/api/v1/swap/${encodeURIComponent(id)}${query}`, swapDetailSchema);
   }
 
   async getSwapByFundingAddress(address: string): Promise<SwapDetail | null> {
@@ -188,15 +233,16 @@ export class ApiClient {
   async executeAction(
     swapId: string,
     action: SwapAction,
-    timeoutMs?: number,
+    opts?: ExecuteActionOptions,
   ): Promise<SwapActionResponse> {
     const validBody = swapActionBodySchema.parse(action);
+    const query = buildProofQuery(opts?.proof);
     return this.post(
-      `/api/v1/swap/${encodeURIComponent(swapId)}/action`,
+      `/api/v1/swap/${encodeURIComponent(swapId)}/action${query}`,
       swapActionResponseSchema,
       validBody,
       undefined,
-      timeoutMs,
+      opts?.timeoutMs,
     );
   }
 
@@ -345,6 +391,11 @@ export class ApiClient {
 
     return envelope.data;
   }
+}
+
+function buildProofQuery(proof: SwapOwnershipProof | undefined): string {
+  if (!proof) return '';
+  return `?${new URLSearchParams({ destAddress: proof.destAddress }).toString()}`;
 }
 
 // One shape for the retry classifier across platforms. TypeError covers

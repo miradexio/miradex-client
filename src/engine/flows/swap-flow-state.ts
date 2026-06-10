@@ -104,21 +104,29 @@ export interface VerificationFailedPhase {
   readonly snapshot: FlowContext;
 }
 
+/**
+ * Snapshot for a swap tracked WITHOUT an ownership proof (server returned
+ * access:'restricted'). Sensitive fields (depositAddr, destAddress, refund,
+ * verification, qr) are guaranteed null; consumers must narrow on
+ * `restricted` before relying on the verified guarantees.
+ */
+export type RestrictedFlowSnapshot = FlowContext & { readonly restricted: true };
+
 export interface ConfirmingPhase {
   readonly phase: 'confirming';
-  readonly snapshot: VerifiedFlowContext;
+  readonly snapshot: VerifiedFlowContext | RestrictedFlowSnapshot;
   readonly requiredAction: RequiredAction | null;
 }
 
 export interface SwappingPhase {
   readonly phase: 'swapping';
-  readonly snapshot: VerifiedFlowContext;
+  readonly snapshot: VerifiedFlowContext | RestrictedFlowSnapshot;
   readonly requiredAction: RequiredAction | null;
 }
 
 export interface SendingPhase {
   readonly phase: 'sending';
-  readonly snapshot: VerifiedFlowContext;
+  readonly snapshot: VerifiedFlowContext | RestrictedFlowSnapshot;
 }
 
 /**
@@ -129,7 +137,7 @@ export interface SendingPhase {
  */
 export interface CancellingPhase {
   readonly phase: 'cancelling';
-  readonly snapshot: VerifiedFlowContext;
+  readonly snapshot: VerifiedFlowContext | RestrictedFlowSnapshot;
   readonly requiredAction: RequiredAction | null;
 }
 

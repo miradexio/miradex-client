@@ -47,6 +47,15 @@ export interface StartAtomicSwapParams {
   readonly existingKeystoreId?: string;
 }
 
+export interface EngineResumeOptions {
+  // BTC keystore address hint for atomic keystore matching when the server
+  // detail is restricted (fundingAddress redacted).
+  readonly keystoreAddress?: string;
+  // destAddress ownership proof — unlocks full detail; without it the swap
+  // resumes in restricted (public-fields-only) mode.
+  readonly destAddress?: string;
+}
+
 export interface EngineConfig {
   readonly apiUrl: string;
   readonly apiTimeout?: number;
@@ -231,14 +240,19 @@ export class MiradexEngine extends EventEmitter<EngineEvents> {
   }
 
   // Routes to the right flow based on provider; caller doesn't need to know.
-  async resume(swapId: string, keystoreAddress?: string): Promise<void> {
-    this.logger.info({ swapId, keystoreAddress: keystoreAddress ?? null }, 'Resuming swap');
+  async resume(swapId: string, opts?: EngineResumeOptions): Promise<void> {
+    const keystoreAddress = opts?.keystoreAddress;
+    const proof = opts?.destAddress ? { destAddress: opts.destAddress } : undefined;
+    this.logger.info(
+      { swapId, keystoreAddress: keystoreAddress ?? null, hasProof: proof !== undefined },
+      'Resuming swap',
+    );
     // Cancel both flows first so a ghost emitter doesn't fire after resume
     // picks the other flow.
     this.swapFlow?.cancel();
     this.atomicFlow?.cancel();
     try {
-      const detail = await this.api.getSwapDetail(swapId);
+      const detail = await this.api.getSwapDetail(swapId, proof);
 
       const knownProviders: readonly string[] = ['atomicswap', 'thorchain', 'chainflip', 'near_intents'];
       if (!knownProviders.includes(detail.provider)) {
@@ -252,6 +266,8 @@ export class MiradexEngine extends EventEmitter<EngineEvents> {
         let keystoreId: string | null = null;
         try {
           const keystores = await this.platform.listKeystores();
+          // fundingAddress is null on restricted details; ks.swapId and the
+          // caller-provided keystoreAddress still match.
           const funding = detail.fundingAddress || keystoreAddress;
           const match = keystores.find(
             (ks) => ks.swapId === swapId || (funding && ks.btcAddress === funding),
@@ -274,7 +290,14 @@ export class MiradexEngine extends EventEmitter<EngineEvents> {
             this.api, this.platform, this.resolvedConfig, swapEmit,
           );
           this.setActiveFlow('swap');
-          void this.swapFlow.resume(swapId, detail.provider, detail.fromToken, detail.toToken, detail);
+          void this.swapFlow.resume({
+            swapId,
+            provider: detail.provider,
+            fromToken: detail.fromToken,
+            toToken: detail.toToken,
+            cachedDetail: detail,
+            proof,
+          });
         }
       } else {
         const swapEmit = this.createScopedSwapEmit();
@@ -283,7 +306,14 @@ export class MiradexEngine extends EventEmitter<EngineEvents> {
           this.api, this.platform, this.resolvedConfig, swapEmit,
         );
         this.setActiveFlow('swap');
-        void this.swapFlow.resume(swapId, detail.provider, detail.fromToken, detail.toToken, detail);
+        void this.swapFlow.resume({
+          swapId,
+          provider: detail.provider,
+          fromToken: detail.fromToken,
+          toToken: detail.toToken,
+          cachedDetail: detail,
+          proof,
+        });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

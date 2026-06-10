@@ -1,5 +1,5 @@
 import type { Logger } from '../interfaces/logger.js';
-import type { ApiClient } from '../api/index.js';
+import type { SwapApi } from '../api/index.js';
 import type { VerificationResult, ClientKeys } from '../types/index.js';
 import type { TempBtcWallet } from '../lib/bitcoin/wallet.js';
 import type { SwapKeystore } from '../lib/keystore.js';
@@ -99,7 +99,7 @@ export interface AtomicSwapHandle {
 }
 
 export interface RunAtomicSwapOptions {
-  readonly api: ApiClient;
+  readonly api: SwapApi;
   readonly params: AtomicSwapParams;
   readonly callbacks: AtomicSwapCallbacks;
   readonly signal?: AbortSignal;
@@ -120,7 +120,7 @@ export interface ResumeAtomicSwapParams {
 }
 
 export interface ResumeAtomicSwapOptions {
-  readonly api: ApiClient;
+  readonly api: SwapApi;
   readonly params: ResumeAtomicSwapParams;
   readonly onProgress: ProgressCallback;
   readonly signal?: AbortSignal;
@@ -133,7 +133,7 @@ export interface ResumeAtomicSwapOptions {
 }
 
 export interface SubmitEncsigParams {
-  readonly api: ApiClient;
+  readonly api: SwapApi;
   readonly swapId: string;
   readonly keys: Pick<ClientKeys, 'b' | 'B'>;
   readonly signedPsbtBase64: string;
@@ -143,7 +143,7 @@ export interface SubmitEncsigParams {
 }
 
 export interface DriveSwapOptions {
-  readonly api: ApiClient;
+  readonly api: SwapApi;
   readonly swapId: string;
   readonly keystoreId: string;
   readonly wallet: TempBtcWallet;

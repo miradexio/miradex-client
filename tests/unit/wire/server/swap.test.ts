@@ -5,6 +5,7 @@ import {
   createSwapBodySchema,
   createSwapResponseSchema,
   swapDetailSchema,
+  isRestrictedDetail,
   recentSwapSchema,
   requiredActionSchema,
 } from '../../../../src/wire/server/swap.zod.js';
@@ -130,6 +131,14 @@ describe('createSwapResponseSchema', () => {
   });
 });
 
+describe('package root exports', () => {
+  it('exposes isRestrictedDetail and swapAccessSchema from the SDK entrypoint', async () => {
+    const root = await import('../../../../src/index.js');
+    expect(typeof root.isRestrictedDetail).toBe('function');
+    expect(root.swapAccessSchema.parse('restricted')).toBe('restricted');
+  });
+});
+
 describe('swapDetailSchema', () => {
   it('parses a detail envelope with optional fields omitted', () => {
     const parsed = swapDetailSchema.parse({
@@ -164,6 +173,80 @@ describe('swapDetailSchema', () => {
       protocolData: null,
     });
     expect(parsed.actualAmountOut).toBe('1.68');
+  });
+
+  it('parses a restricted detail with sensitive fields nulled', () => {
+    const parsed = swapDetailSchema.parse({
+      swapNumber: 'MIRA-XXXXYYYY',
+      access: 'restricted',
+      status: 'completed',
+      provider: 'thorchain',
+      fromToken: 'BTC',
+      fromChain: 'bitcoin',
+      toToken: 'ETH',
+      toChain: 'ethereum',
+      amountIn: '0.1',
+      amountInUsd: null,
+      expectedAmountOut: null,
+      expectedAmountOutUsd: null,
+      actualAmountOut: '1.68',
+      actualAmountOutUsd: null,
+      priceImpactPct: null,
+      depositAddress: null,
+      fundingAddress: null,
+      destAddress: null,
+      refundAddress: null,
+      depositTxHash: null,
+      outputTxHash: null,
+      refundTxHash: null,
+      expiresAt: null,
+      createdAt: '2026-04-18T10:00:00.000Z',
+      updatedAt: '2026-04-18T11:00:00.000Z',
+      completedAt: '2026-04-18T11:00:00.000Z',
+      durationSeconds: 3600,
+      requiresFunding: false,
+      verification: null,
+      protocolData: null,
+    });
+    expect(parsed.access).toBe('restricted');
+    expect(parsed.destAddress).toBeNull();
+    expect(isRestrictedDetail(parsed)).toBe(true);
+  });
+
+  it('treats a detail without an access field (old server) as full', () => {
+    const parsed = swapDetailSchema.parse({
+      swapNumber: 'MIRA-XXXXYYYY',
+      status: 'completed',
+      provider: 'thorchain',
+      fromToken: 'BTC',
+      fromChain: 'bitcoin',
+      toToken: 'ETH',
+      toChain: 'ethereum',
+      amountIn: '0.1',
+      amountInUsd: null,
+      expectedAmountOut: null,
+      expectedAmountOutUsd: null,
+      actualAmountOut: '1.68',
+      actualAmountOutUsd: null,
+      priceImpactPct: null,
+      depositAddress: null,
+      fundingAddress: null,
+      destAddress: '0xabc',
+      refundAddress: null,
+      depositTxHash: null,
+      outputTxHash: null,
+      refundTxHash: null,
+      expiresAt: null,
+      createdAt: '2026-04-18T10:00:00.000Z',
+      updatedAt: '2026-04-18T11:00:00.000Z',
+      completedAt: '2026-04-18T11:00:00.000Z',
+      durationSeconds: 3600,
+      requiresFunding: false,
+      verification: null,
+      protocolData: null,
+    });
+    expect(parsed.access).toBeUndefined();
+    expect(isRestrictedDetail(parsed)).toBe(false);
   });
 });
 

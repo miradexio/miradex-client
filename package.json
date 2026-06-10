@@ -1,6 +1,6 @@
 {
   "name": "@miradexio/client",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Headless crypto swap SDK — BTC/XMR atomic swaps, THORChain, Chainflip, NEAR Intents. Works in Node.js, browsers, React Native, and bots.",
   "type": "module",
   "main": "dist/index.js",

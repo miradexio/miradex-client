@@ -1,5 +1,6 @@
-import type { ApiClient } from '../../api/index.js';
+import type { ApiClient, SwapOwnershipProof } from '../../api/index.js';
 import { ApiError, NetworkError } from '../../api/index.js';
+import { isRestrictedDetail } from '../../wire/server/index.js';
 import type { PlatformAdapter } from '../platform.js';
 import type { ResolvedEngineConfig } from '../miradex-engine.js';
 import type { SwapFlowState } from './swap-flow-state.js';
@@ -91,6 +92,18 @@ export interface SwapFlowOptions {
   readonly maxRetries?: number;
 }
 
+export interface SwapFlowResumeParams {
+  readonly swapId: string;
+  readonly provider: string;
+  readonly fromToken: string;
+  readonly toToken: string;
+  // Skips the redundant initial getSwapDetail (the engine already fetched it).
+  readonly cachedDetail?: SwapDetail;
+  // destAddress ownership proof. Without it (or with a stale one) the server
+  // returns restricted detail and the flow runs in restricted mode.
+  readonly proof?: SwapOwnershipProof;
+}
+
 export class SwapFlow {
   private abortController: AbortController | null = null;
   private readonly pollMs: number;
@@ -100,6 +113,7 @@ export class SwapFlow {
   private flowCtx: FlowContext | null = null;
   private lastPhase: string = 'idle';
   private lastPollKey: string | null = null;
+  private proof: SwapOwnershipProof | null = null;
 
   constructor(
     private readonly api: ApiClient,
@@ -186,6 +200,7 @@ export class SwapFlow {
   }): Promise<void> {
     this.abortController = new AbortController();
     const provider = params.selectedQuote.provider;
+    this.proof = { destAddress: params.destAddress };
     this.logger.info({ provider, fromToken: params.fromToken, toToken: params.toToken, amount: params.amount }, 'SwapFlow.start()');
 
     this.setFlowContext({
@@ -224,14 +239,10 @@ export class SwapFlow {
   // Pass cachedDetail to skip a redundant getSwapDetail. Without it, a
   // network blip on the second fetch sends ApiClient.withRetry into an
   // unbounded backoff loop and pins the UI on 'creating-swap' for minutes.
-  async resume(
-    swapId: string,
-    provider: string,
-    fromToken: string,
-    toToken: string,
-    cachedDetail?: SwapDetail,
-  ): Promise<void> {
+  async resume(params: SwapFlowResumeParams): Promise<void> {
+    const { swapId, provider, fromToken, toToken, cachedDetail } = params;
     this.abortController = new AbortController();
+    this.proof = params.proof ?? null;
     this.logger.info({ swapId, provider, cached: cachedDetail !== undefined }, 'SwapFlow.resume()');
 
     this.setFlowContext({
@@ -243,6 +254,12 @@ export class SwapFlow {
       this.transition({ phase: 'creating-swap', snapshot: this.flowCtx as FlowContext });
 
       const detail = cachedDetail ?? (await this.fetchDetailWithRetry(swapId));
+
+      if (isRestrictedDetail(detail)) {
+        this.logger.info({ swapId, status: detail.status }, 'Resumed swap is restricted (no ownership proof)');
+        await this.runRestricted(detail);
+        return;
+      }
 
       if (TERMINAL_STATUSES.has(detail.status)) {
         this.logger.info({ swapId, status: detail.status }, 'Resumed swap is terminal');
@@ -268,7 +285,7 @@ export class SwapFlow {
       // Pick the initial phase from actual server status so we don't
       // briefly flash through awaiting-deposit on a past-deposit swap.
       await this.emitInitialResumePhase(detail, {
-        destAddress: detail.destAddress,
+        destAddress: detail.destAddress ?? '',
         refundAddress: detail.refundAddress ?? '',
         toToken, fromToken, amount: detail.amountIn,
         fromChain: detail.fromChain,
@@ -281,11 +298,120 @@ export class SwapFlow {
     }
   }
 
+  // Restricted mode: the server withheld sensitive fields (no valid
+  // ownership proof). Track status → phase with base-validated nullable
+  // snapshots; never run populated/verified validation and never surface a
+  // deposit address, QR, or verification payload.
+  private async runRestricted(detail: SwapDetail): Promise<void> {
+    this.setFlowContext({
+      restricted: true,
+      swapId: detail.swapNumber,
+      swapNumber: detail.swapNumber,
+      provider: detail.provider,
+      fromToken: detail.fromToken,
+      toToken: detail.toToken,
+      depositAmount: detail.amountIn,
+      amountInUsd: detail.amountInUsd,
+      expectedOut: detail.expectedAmountOut,
+      expectedOutUsd: detail.expectedAmountOutUsd,
+      depositAddr: null,
+      destAddress: null,
+      refundAddress: null,
+      qr: null,
+      verification: null,
+      extra: {
+        text: 'Limited view — enter the destination address to unlock full details.',
+        type: 'message',
+      },
+    });
+
+    if (TERMINAL_STATUSES.has(detail.status)) {
+      this.emitTerminalFromDetail(detail);
+      return;
+    }
+
+    this.emitRestrictedStatusPhase(detail.status);
+    await this.pollLoopRestricted(detail.swapNumber);
+  }
+
+  private restrictedSnapshot(phase: string): (FlowContext & { restricted: true }) | null {
+    const base = validateBase(this.flowCtx, phase);
+    if (!base.ok) {
+      this.logger.error({ error: base.error }, 'restricted FlowContext invalid');
+      this.emitError(phase, base.error.message);
+      return null;
+    }
+    return { ...base.data, restricted: true };
+  }
+
+  private emitRestrictedStatusPhase(status: string): void {
+    switch (status) {
+      case 'deposited': {
+        const snapshot = this.restrictedSnapshot('confirming');
+        if (snapshot) this.transition({ phase: 'confirming', snapshot, requiredAction: null });
+        return;
+      }
+      case 'swapping': {
+        const snapshot = this.restrictedSnapshot('swapping');
+        if (snapshot) this.transition({ phase: 'swapping', snapshot, requiredAction: null });
+        return;
+      }
+      case 'sending': {
+        const snapshot = this.restrictedSnapshot('sending');
+        if (snapshot) this.transition({ phase: 'sending', snapshot });
+        return;
+      }
+      case 'cancelling': {
+        const snapshot = this.restrictedSnapshot('cancelling');
+        if (snapshot) this.transition({ phase: 'cancelling', snapshot, requiredAction: null });
+        return;
+      }
+      default: {
+        // Pre-deposit statuses (initializing / pending / awaiting_funding):
+        // stay on creating-swap — there is no deposit panel to show without
+        // an address, and the status banner explains the limited view.
+        const base = validateBase(this.flowCtx, `restricted:${status}`);
+        if (base.ok) this.emitFn({ phase: 'creating-swap', snapshot: base.data });
+        return;
+      }
+    }
+  }
+
+  private async pollLoopRestricted(swapId: string): Promise<void> {
+    const deadline = Date.now() + this.pollTimeoutMs;
+
+    while (Date.now() < deadline && !this.signal.aborted) {
+      await delay(this.pollMs, this.signal).catch(() => {});
+      if (this.signal.aborted) {
+        this.logger.info({ swapId }, 'Restricted poll cancelled');
+        this.transition({ phase: 'cancelled', snapshot: this.flowCtx });
+        return;
+      }
+
+      let detail: SwapDetail;
+      try { detail = await this.api.getSwapDetail(swapId, this.proof ?? undefined); } catch { continue; }
+
+      const pollKey = `restricted|${detail.status}`;
+      if (pollKey !== this.lastPollKey) {
+        this.logger.debug({ swapId, serverStatus: detail.status }, 'Restricted poll tick');
+        this.lastPollKey = pollKey;
+      }
+
+      if (TERMINAL_STATUSES.has(detail.status)) {
+        this.logger.info({ swapId, status: detail.status }, 'Restricted poll detected terminal status');
+        this.emitTerminalFromDetail(detail);
+        return;
+      }
+
+      this.emitRestrictedStatusPhase(detail.status);
+    }
+  }
+
   private async fetchDetailWithRetry(swapId: string): Promise<SwapDetail> {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        return await this.api.getSwapDetail(swapId);
+        return await this.api.getSwapDetail(swapId, this.proof ?? undefined);
       } catch (err: unknown) {
         if (!isTransientError(err)) throw err;
         lastErr = err;
@@ -664,7 +790,7 @@ export class SwapFlow {
 
       tick++;
       let detail: SwapDetail;
-      try { detail = await this.api.getSwapDetail(swapId); } catch { continue; }
+      try { detail = await this.api.getSwapDetail(swapId, this.proof ?? undefined); } catch { continue; }
 
       if (detail.verification && !this.flowCtx?.verification?.verified) {
         this.setFlowContext({ verification: {

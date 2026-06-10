@@ -31,6 +31,9 @@ const FlowContextExtraSchema = z.object({
 
 // Every field nullable; the engine builds it up progressively.
 const FlowContextBaseSchema = z.object({
+  // True when the server returned a restricted (ownership-proof-less) detail:
+  // sensitive fields stay null and populated/verified validation is skipped.
+  restricted: z.boolean(),
   depositAddr: z.string().nullable(),
   destAddress: z.string().nullable(),
   refundAddress: z.string().nullable(),
@@ -142,6 +145,7 @@ export function validateVerified(
 }
 
 const EMPTY_FLOW_CONTEXT: FlowContext = {
+  restricted: false,
   depositAddr: null,
   destAddress: null,
   refundAddress: null,

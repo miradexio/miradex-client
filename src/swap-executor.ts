@@ -145,15 +145,23 @@ export class SwapExecutor {
   }
 
   async getSweepOutputs(swapId: string): Promise<unknown> {
-    return this.api.executeAction(swapId, { type: 'get-outputs' }, 120_000);
+    return this.api.executeAction(swapId, { type: 'get-outputs' }, { timeoutMs: 120_000 });
   }
 
   async submitKeyImages(swapId: string, keyImagesHex: string): Promise<unknown> {
-    return this.api.executeAction(swapId, { type: 'get-key-images', keyImagesHex }, 120_000);
+    return this.api.executeAction(
+      swapId,
+      { type: 'get-key-images', keyImagesHex },
+      { timeoutMs: 120_000 },
+    );
   }
 
   async submitMoneroTx(swapId: string, signedTxHex: string): Promise<unknown> {
-    return this.api.executeAction(swapId, { type: 'submit-monero-tx', signedTxHex }, 120_000);
+    return this.api.executeAction(
+      swapId,
+      { type: 'submit-monero-tx', signedTxHex },
+      { timeoutMs: 120_000 },
+    );
   }
 
   async pollUntil(

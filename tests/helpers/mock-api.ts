@@ -129,8 +129,11 @@ export function createMockApi(
       return config.createSwapResponse;
     },
 
-    getSwapDetail: async (id: string): Promise<SwapDetail> => {
-      calls.push({ method: 'getSwapDetail', args: { id } });
+    getSwapDetail: async (
+      id: string,
+      proof?: { readonly destAddress: string },
+    ): Promise<SwapDetail> => {
+      calls.push({ method: 'getSwapDetail', args: { id, proof } });
       const response = config.swapDetailResponses.get(id) ?? config.swapDetailResponses.get('*');
       if (!response) throw new Error(`No mock response for swap ${id}`);
       if (Array.isArray(response)) {
@@ -141,9 +144,13 @@ export function createMockApi(
       return response;
     },
 
-    executeAction: async (swapId: string, action: SwapAction): Promise<SwapActionResponse> => {
+    executeAction: async (
+      swapId: string,
+      action: SwapAction,
+      opts?: { readonly timeoutMs?: number; readonly proof?: { readonly destAddress: string } },
+    ): Promise<SwapActionResponse> => {
       const actionType = action.type;
-      calls.push({ method: 'executeAction', args: { swapId, action } });
+      calls.push({ method: 'executeAction', args: { swapId, action, opts } });
       const key = `${swapId}:${actionType}`;
       return config.actionResponses.get(key) ?? defaultActionResponse(swapId, actionType);
     },
